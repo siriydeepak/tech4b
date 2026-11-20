@@ -1,0 +1,759 @@
+AURUM — Architecture, Datasets & Tech Stack for a Minimal MVP
+For AURUM, I recommend building a customer-facing gold verification and exchange transparency platform rather than attempting to build a complete jewellery testing system from scratch.
+
+The MVP should demonstrate one complete transaction:
+1. A customer enters or scans their jewellery details.
+2. The jeweller records physical verification results (purity, weight and deductions).
+3. AURUM retrieves the applicable gold price.
+4. The system calculates the estimated fair exchange value.
+5. Both parties receive an evidence-backed transaction report.
+6. AI flags missing, inconsistent or suspicious records.
+The most important design decision is to keep physical gold verification, financial calculations and AI-assisted record analysis as separate modules. AI should not invent purity measurements or determine the actual gold content from an ordinary photograph.
+
+1. MVP scope: What should actually be built?
+Recommended MVP
+ One complete gold-exchange workflow
+Module	MVP functionality	Priority
+User management	Customer and jeweller login	Essential
+Jewellery registration	Type, weight, purity, photos	Essential
+Physical verification	Enter XRF/purity and weighing results	Essential
+Hallmark verification	Enter and verify HUID information	Essential
+Gold price engine	Daily reference gold price	Essential
+Exchange calculator	Calculate estimated gold value and deductions	Essential
+Evidence records	Store measurements, photos and timestamps	Essential
+AI assistance	Flag inconsistencies and missing information	Secondary
+Transaction report	Generate customer-facing PDF	Essential
+Dispute replay	Retrieve and compare previous transaction records	Future enhancement
+
+Avoid building initially: computer vision-based purity estimation, direct XRF hardware integration, blockchain, custom machine learning models and automated fraud detection. These increase development complexity without being necessary to demonstrate the core concept.
+
+2. Proposed system architecture
+I recommend a modular monolithic architecture for the first version. It is easier to develop, test and deploy than microservices, while allowing individual modules to be separated later.
+
+
+
+
+
+
+
+
+devpost.com
+
+
+Overall architecture
+USER INTERFACE
+
+Customer dashboard · Jeweller dashboard · Admin dashboard
+
+Next.js + React + Tailwind CSS
+
+
+APPLICATION BACKEND / API
+
+Authentication · Validation · Business logic · Permissions
+
+Next.js server routes / server actions
+
+
+01. Verification
+
+HUID entry, jewellery details, XRF and weighing records
+
+
+02. Pricing engine
+
+Gold rates, purity conversion, exchange valuation
+
+
+03. AI analysis
+
+Record inconsistencies, missing evidence, anomaly flags
+
+
+04. Report generation
+
+Transaction summary, evidence, calculation breakdown
+
+
+
+
+SUPABASE — CENTRAL DATA LAYER
+
+PostgreSQL · Authentication · File Storage · Row-level security
+
+
+EXTERNAL DATA SOURCES
+BIS
+
+HUID verification
+
+IBJA
+
+Reference gold rates
+
+LLM API
+
+AI-assisted analysis
+
+PDF engine
+
+Evidence reports
+
+
+
+
+How the modules communicate
+Module	Input	Output
+Verification	HUID, XRF result, weight	Verified/recorded evidence
+Pricing	Purity, net weight, reference rate	Estimated gold value
+AI analysis	Transaction records	Inconsistency flags
+Report generator	All transaction data	Downloadable PDF
+History	Transaction ID	Previous transaction and evidence
+
+One important distinction: the application should label evidence as either officially verified, instrument-recorded, jeweller-entered or customer-provided. This prevents a manually entered measurement from being presented as an independently verified measurement.
+
+3. Datasets and external resources
+You do not need a massive machine-learning dataset to build the MVP. Most of AURUM's initial functionality is deterministic and should use structured data.
+
+I would divide the data requirements into four categories.
+A. Gold pricing datasets
+
+
+
+
+
+
+
+
+
+
+1. India Bullion and Jewellers Association (IBJA)
+Primary recommended source
+Daily Indian gold benchmark prices
+IBJA daily gold rates
+
+Collect:
+- 999 purity (24K)
+- 995 purity
+- 916 purity (22K)
+- 750 purity (18K)
+- 585 purity (14K)
+- AM and PM rates
+- Rate date and update timestamp
+- Unit and tax treatment
+IBJA publishes rates per 10 grams and excludes GST and making charges. Its official rates API is available through a subscription process, so contact IBJA for access instead of assuming its public website is an unrestricted API. 
+Ibjarates+1
+
+
+2. World Gold Council
+Gold price historical dataUseful for:
+- Historical gold-price analysis.
+- International price comparisons.
+- Long-term price trend visualisation.
+It is a supplementary source, not a substitute for a transaction-date Indian exchange benchmark. 
+World Gold Council+1
+
+B. Hallmark and HUID verification resources
+
+
+
+
+
+
+
+
+
+
+3. Bureau of Indian Standards (BIS)
+Essential resource
+Official hallmark verification
+BIS hallmarking FAQsBIS CARE application
+
+The HUID is a unique six-character alphanumeric identifier for hallmarked articles.
+
+For the MVP, implement:
+1. Jeweller/customer enters HUID.
+2. User opens BIS CARE's Verify HUID facility.
+3. User checks the official result.
+4. User records the returned details in AURUM.
+5. User uploads supporting evidence, where available.
+6. AURUM compares the entered details against the physical jewellery record.
+Capture:
+- HUID number
+- Declared purity
+- Jewellery type
+- Jeweller information
+- Assaying and Hallmarking Centre
+- Official photograph/weight details when available
+- Verification date and status
+Important integration limitation: I would not assume BIS provides an unrestricted public HUID API. Build manual verification with evidence capture first. Approach BIS for authorised API integration later.
+
+BIS's 2026 digital upgrades also make article photographs and recorded weights available through its verification ecosystem, which creates a particularly useful comparison opportunity for AURUM. 
+Bureau of Indian Standards+2
+
+C. Jewellery transaction dataset
+You should create your own structured dataset.
+
+There is no need to wait for a publicly available jewellery transaction dataset.
+
+Suggested transaction dataset fields
+Field	Example
+Transaction ID	AUR-001
+Jewellery type	Gold chain
+Gross weight	12.50 g
+Stone weight	0.50 g
+Net gold weight	12.00 g
+Declared purity	22K
+Measured purity	916 fineness
+HUID	Six-character code
+Gold rate	₹/gram
+Deductions	2%
+Final offer	Calculated value
+Evidence	Image, report, timestamp
+
+For your prototype, create approximately:
+- 50 normal transaction records.
+- 20 records with missing information.
+- 20 records with inconsistent measurements.
+- 10 records with mismatched HUID or declared purity information.
+These are proposed prototype test cases, not real-world fraud statistics. Clearly label synthetic records as simulated.
+D. AI anomaly-detection dataset
+Rather than training a new model, create a small labelled dataset of transaction inconsistencies.
+Scenario	Expected AI output
+Declared 22K, measured 18K	Purity mismatch
+Gross weight differs from recorded weight	Weight inconsistency
+HUID details do not match jewellery type	Hallmark mismatch
+Missing XRF report	Incomplete evidence
+Gold rate from an old date	Stale pricing record
+Duplicate transaction ID	Duplicate record
+Unexplained deductions	Calculation transparency warning
+
+This becomes your initial AI evaluation dataset.
+
+My recommendation: use a rule-based anomaly engine first, and use an LLM to explain its findings in understandable language. You can add trained anomaly-detection models when you have enough real, consented and labelled transaction data.
+
+4. Recommended technology stack
+For a hackathon MVP, I would choose technologies that let you build quickly without compromising the financial calculation logic.
+
+
+
+
+
+
+
+
+
+
+Frontend — Next.js + React + TypeScript
+
+Dashboards, forms, transaction pages and responsive UI
+
+Official documentation
+
+Use
+
+
+
+
+
+
+
+
+
+
+
+
+UI styling — Tailwind CSS + shadcn/ui
+
+Elegant gold-themed interface, tables, forms and cards
+
+
+
+
+
+
+
+
+
+
+
+
+
+Backend and database — Supabase
+
+PostgreSQL, authentication, image storage and access control
+
+Official documentation
+
+Use
+
+
+
+
+
+
+
+
+
+
+
+
+Calculation engine — Python
+
+Optional FastAPI service for valuation, validation and future integrations
+
+
+
+
+
+
+
+
+
+
+
+
+
+AI — Gemini API
+
+Explain inconsistencies, extract structured information and summarise reports
+
+
+
+
+
+
+
+
+
+
+
+
+
+PDF generation — ReportLab
+
+Downloadable gold transaction and evidence reports
+
+
+
+
+
+
+
+
+
+
+
+
+
+Deployment — Vercel
+
+Host the Next.js application
+
+
+
+Libraries to install
+Purpose	Library
+Forms	React Hook Form
+Validation	Zod
+Database client	Supabase JS
+Charts	Recharts
+Icons	Lucide React
+QR codes	qrcode
+PDF generation	ReportLab
+AI integration	Gemini API SDK
+Image upload	Supabase Storage
+
+A simpler architecture is preferable: Next.js API routes can initially handle all business logic. You do not need a separate FastAPI server unless you want to develop the Python calculation engine independently.
+
+5. Core calculation engine — AURUM's most important feature
+This is the part that should be completely deterministic, transparent and testable.
+Example gold exchange calculation
+Suppose a customer brings a 22K gold chain.
+Sample transaction
+Gross weight
+12.50 g
+
+Stone weight
+0.50 g
+
+Net gold weight
+12.00 g
+
+Purity
+91.6%
+
+
+
+Calculation
+
+Illustrative reference rate: ₹12,000/g for 999 gold. This is a hypothetical input, not a current market quote.
+\[
+\text{Pure gold equivalent}
+=12\times0.916=10.992g
+\]
+
+\[
+\text{Gold value}=10.992\times ₹12,000
+\]
+
+₹1,31,904
+Illustrative gross metal value before any applicable refining, melting or other agreed deductions.
+
+Calculation logic
+\[
+V = W_n \times R_{999}\times\frac{P}{999}
+\]
+
+Where:
+- \(W_n\) = net gold weight in grams.
+- \(R_{999}\) = reference price per gram of 999 gold.
+- \(P\) = measured fineness, such as 916.
+If using the IBJA 916 rate directly, calculate using that rate per gram and do not apply the purity conversion again.
+
+Then:
+\[
+V_{\text{offer}}=V-D
+\]
+
+Where \(D\) represents individually itemised, agreed deductions.
+
+For example:
+- Melting/refining deduction.
+- Other documented adjustments.
+- Applicable transaction-specific charges.
+Do not hardcode a universal deduction percentage. Store the reason, amount, calculation method and party accepting it.
+What makes this feature valuable?
+Instead of displaying only a final price, AURUM should show:
+1. Gross jewellery weight.
+2. Deducted non-gold weight.
+3. Measured purity.
+4. Reference gold rate and timestamp.
+5. Calculated metal value.
+6. Each deduction separately.
+7. Final jeweller offer.
+This makes the financial calculation explainable and allows customers to compare the jeweller's offer against the documented calculation.
+
+6. Database architecture
+Use PostgreSQL through Supabase.
+
+I recommend these seven initial tables:
+Table	Important fields	Purpose
+users	id, name, role, phone	Customer/jeweller accounts
+jewellery	id, owner_id, type, gross_weight, purity	Jewellery information
+verifications	jewellery_id, HUID, XRF result, verified_by	Physical and hallmark evidence
+gold_rates	date, purity, rate, source, session	Historical reference prices
+transactions	id, customer_id, jeweller_id, jewellery_id, final_offer	Exchange records
+evidence	transaction_id, file_url, evidence_type, timestamp	Photos and documents
+anomaly_flags	transaction_id, flag_type, severity, explanation	AI/rule-based warnings
+
+Important database feature: Transaction history
+Every transaction should preserve a snapshot of the values used at that time.
+
+For example, if the gold rate changes tomorrow, yesterday's transaction must not change.
+
+Store:
+- Rate value.
+- Rate source.
+- Rate date and session.
+- Purity used.
+- Weight used.
+- Deduction breakdown.
+- Calculation version.
+- Evidence references.
+- Customer and jeweller acceptance timestamps.
+For privacy, configure Supabase Row Level Security so customers can access their own transactions and jewellers can access only transactions they are authorised to handle. Keep privileged API keys on the server. 
+Supabase Docs+2
+
+
+7. AI implementation: What should AI actually do?
+I would avoid claiming that AURUM uses AI to determine the actual purity of gold. That would require validated physical measurements and a suitable scientific model.
+
+Instead, give AI three useful responsibilities.
+
+
+
+
+
+
+
+
+
+
+AI Feature 1 — Evidence extraction
+
+Extract relevant details from uploaded receipts, reports and transaction documents.
+
+Example: Extract weight, purity, jeweller name and transaction date from a bill.
+MVP feasible
+
+
+
+
+
+
+
+
+
+
+
+
+
+AI Feature 2 — Inconsistency detection
+
+Compare declared purity, recorded purity, HUID information and weight.
+
+Example: Declared 22K, but recorded XRF result is 18K. Flag for review.
+MVP feasible
+
+
+
+
+
+
+
+
+
+
+
+
+
+AI Feature 3 — Explainable transaction reports
+
+Convert technical measurements and calculations into understandable customer-facing explanations.
+
+Example: Explain why the offer differs from the reference gold value.
+MVP feasible
+
+
+
+Suggested AI workflow
+Transaction records + uploaded evidence
+
+Structured data extraction (Gemini)
+
+Deterministic validation engine
+
+AI explanation of detected inconsistencies
+
+AURUM evidence and risk report
+
+
+The deterministic validation engine should decide whether a discrepancy exists. The LLM should explain the discrepancy, not decide whether a transaction is fraudulent.
+
+8. Application screens to develop
+For a convincing demonstration, build six primary screens.
+
+
+
+
+
+
+
+
+
+
+1. AURUM Dashboard
+
+Gold price, recent transactions, verification status and exchange estimates.
+
+
+
+
+
+
+
+
+
+
+
+2. Jewellery Registration
+
+Upload jewellery image, enter type, weight, purity and HUID.
+
+
+
+
+
+
+
+
+
+
+
+3. Verification Centre
+
+HUID lookup workflow, XRF results and measurement evidence.
+
+
+
+
+
+
+
+
+
+
+
+4. Exchange Calculator
+
+Purity, net weight, live/reference rate and deduction breakdown.
+
+
+
+
+
+
+
+
+
+
+
+5. AI Analysis
+
+Missing information, inconsistencies and explanations.
+
+
+
+
+
+
+
+
+
+
+
+6. Transaction Report
+
+Evidence-backed report with a unique transaction ID and QR code.
+
+
+9. Suggested project folder structure
+A manageable Next.js project could look like this:
+aurum/
+│
+├── app/
+│   ├── dashboard/
+│   ├── jewellery/
+│   ├── verification/
+│   ├── calculator/
+│   ├── transactions/
+│   ├── reports/
+│   └── api/
+│       ├── gold-rates/
+│       ├── verification/
+│       ├── calculate/
+│       └── ai-analysis/
+│
+├── components/
+│   ├── dashboard/
+│   ├── jewellery/
+│   ├── verification/
+│   ├── calculator/
+│   └── reports/
+│
+├── lib/
+│   ├── supabase.ts
+│   ├── gold-pricing.ts
+│   ├── validation.ts
+│   ├── anomaly-detection.ts
+│   ├── ai-analysis.ts
+│   └── pdf-generator.ts
+│
+├── types/
+│   └── transaction.ts
+│
+├── supabase/
+│   └── migrations/
+│
+└── public/
+
+
+10. Implementation roadmap
+For a small team, I would aim for a 3-week MVP.
+1. Week 1 — Foundation
+   - Set up Next.js and Supabase.
+   - Implement customer/jeweller login.
+   - Build jewellery registration.
+   - Create database tables.
+   - Implement image and document uploads.
+     Deliverable: Working registration system
+2. Week 2 — Core functionality
+   - Implement gold price storage and retrieval.
+   - Build the exchange calculation engine.
+   - Implement HUID verification workflow.
+   - Create transaction history.
+   - Generate PDF reports.
+     Deliverable: Complete gold exchange workflow
+3. Week 3 — AI and presentation
+   - Implement document extraction.
+   - Add inconsistency detection.
+   - Add AI-generated explanations.
+   - Build customer-facing transaction reports.
+   - Test with synthetic transaction datasets.
+   - Deploy using Vercel.
+     Deliverable: Demonstrable AURUM MVP
+
+11. What should you demonstrate during the hackathon?
+I recommend demonstrating one realistic end-to-end scenario.
+AURUM — Live prototype demonstration
+1. Customer submits jewellery
+   
+   A customer uploads a photograph of a gold chain and enters its details.
+2. Jeweller records verification
+   
+   The jeweller enters the measured weight, XRF purity result and HUID.
+3. AURUM verifies the records
+   
+   Compare recorded information against the available BIS verification details.
+4. AURUM calculates the exchange value
+   
+   Use the saved reference gold rate and measured purity to calculate the metal value.
+5. AI identifies inconsistencies
+   
+   For example, a mismatch between declared purity and the XRF result.
+6. Both parties receive a report
+   
+   Display the calculation, evidence, deductions and transaction history.
+AURUM
+One transaction. Complete transparency.
+Physical verification + Financial intelligence + Shared evidence
+
+
+12. Additional resources for development
+These are the most useful starting points for your team:
+Resource	What to use it for
+Next.js	Frontend and backend
+Supabase	Database and authentication
+Gemini API	AI document extraction
+IBJA	Indian gold price references
+BIS	Hallmarking standards
+World Gold Council	Gold market research
+ReportLab	PDF report generation
+Vercel	Deployment
+
+
+13. Final recommendation: What to prioritise
+Not every proposed feature contributes equally to AURUM's novelty.
+Feature	MVP importance	Novelty potential
+Gold exchange calculator	Very high	Medium
+HUID verification workflow	Very high	Medium
+Evidence-backed transaction records	Very high	High
+Customer–jeweller shared history	High	High
+AI inconsistency detection	High	High
+Automated XRF integration	Low initially	High
+Blockchain transaction records	Not necessary	Low without a specific use case
+AI gold purity prediction from images	Avoid initially	Unproven
+
+My recommended MVP combination
+Build these five features exceptionally well:
+1. Jewellery registration and physical verification records.
+2. BIS HUID verification with supporting evidence.
+3. Transparent gold exchange valuation.
+4. AI-assisted inconsistency detection.
+5. Shared, timestamped customer–jeweller transaction reports.
+This is a much stronger prototype than a simple gold price calculator with an AI chatbot.
+
+One particularly important differentiator: preserve the complete evidence and calculation state of every transaction so that either party can later reconstruct exactly how an exchange offer was calculated and which information supported it. This is the foundation of AURUM's proposed dispute-replay capability.
+
+My suggestion is to build the first version as a web application, make the transaction calculation engine the technical core, and treat AI as an additional intelligence layer rather than the foundation of the application.
